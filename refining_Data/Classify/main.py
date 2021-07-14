@@ -1,48 +1,16 @@
-from numpy import spacing
-from sklearn.feature_extraction.text import TfidfVectorizer
 from collections import defaultdict
 import nltk
 import pandas as pd
-from openpyxl import Workbook
-from pykospacing import Spacing
-from hanspell import spell_checker
-from tqdm.notebook import tqdm
 from soynlp.normalizer import *
-import kss
-import re
-from IPython.display import display
 import numpy as np
+import similarity
+from openpyxl import Workbook
 
 MAXSIZE = 10
 
 path_sample = 'src/sample_short.xlsx'
-path_training = 'src/categories.xlsx'
-
-
-def spell_text(texts):
-    sample_space = spacing(texts)
-    # spelled_sent = spell_checker.check(sample_space)
-    # sample_space_spell = spelled_sent.checked
-    return sample_space
-
-
-def process_sentence(texts):
-    # chars = "<o:p/>"
-    tmp = ''
-    for sent_ in kss.split_sentences(texts):
-        if ('안녕하세요' in sent_) or ('하이닥' in sent_) or ('감사합니다' in sent_) or (len(sent_)) > 500:
-            continue
-        tmp = tmp + ' ' + (spell_text(sent_))
-        # print(spell_text(sent_), end=' ')
-    # for i in range(len(chars)):
-    #     tmp = tmp.replace(chars[i], "")
-    tmp = tmp.replace("<br>", "")
-    tmp = tmp.replace("<o:p>", "")
-    tmp = tmp.replace("</o:p>", "")
-    if tmp == "" or tmp == "  ":
-        return "아직 작성되지 않았습니다."
-    return tmp
-
+# path_training = 'src/categories.xlsx'
+test_path = 'src/test2.xlsx'  # 카테고리 항목
 
 def read_file(file_paths):  # ==파일 읽어오기
     df_ = pd.read_excel(file_paths)
@@ -50,11 +18,15 @@ def read_file(file_paths):  # ==파일 읽어오기
     return df_, numpy
 
 
-def classify(list_, text):
-    i = 1
+def classify(list_, text_Q, text_A):
     correct = True
-    print(text)
-    ant = input("요약문을 입력하세요 : ")
+
+    print('\n')
+    print('질문 = '+text_Q)
+    print('답변 = '+text_A)
+
+    ant_Q = input("질문 요약문을 입력하세요 : ")
+    ant_A = input("답변 요약문을 입력하세요 : ")
     while correct:
         select = (input('0~%d중 분류를 입력하세요 : ' % (len(list_) - 1)).split())
         for j in range(len(select)):
@@ -63,49 +35,80 @@ def classify(list_, text):
             else:
                 correct = True
 
-    for k in range(len(select)):
-        while category3[int(select[k])][i] != 0:
-            i = i + 1
-        category3[int(select[k])][i] = (text, ant)
-    # print(category3[select])
+    Idx.append(" ".join(select))
+    Query.append((text_Q, ant_Q))
+    Answer.append((text_A, ant_A))
 
 
 # =============================================================
 
 text_df, text_df_np = read_file(path_sample)  # 학습할 데이터
-ct_df, ct_df_np = read_file(path_training)  # 데이터를 나눌 카테고리
-
-# sentence_question = []
-# sentence_answer = []
-#
-# for i in tqdm(range(0, len(text_df))):
-#     sentence_question.append(process_sentence(text_df_np[i][1]))
-#     sentence_answer.append(process_sentence(text_df_np[i][2]))
+ct_df, ct_df_np = read_file(test_path)  # 데이터를 나눌 카테고리
 
 # =============================================================
 
 data = pd.DataFrame()
 standard = pd.DataFrame()
 data['querys'] = text_df['질문']
-standard['category3'] = ct_df['Category3']
+data['answers'] = text_df['답변']
+standard['category3'] = ct_df['Category4']
 # display(standard['category3'])
 
 standard = standard[standard['category3'].notna()]
 data = data[data['querys'].notna()]
-category3 = [[0 for j in range(MAXSIZE)] for i in range(len(standard))]
-tmp = standard['category3'].values.tolist()
-Qst = data['querys'].values.tolist()
-
-for i in range(len(standard['category3'])):
-    category3[i][0] = tmp[i]
-    print(i, '번 : ', category3[i][0], end=' ')
+data = data[data['answers'].notna()]
+# category3 = [[0 for j in range(MAXSIZE)] for i in range(len(standard))]
+category3 = []
 
 # =============================================================
 
-annotation = []
+tmp = standard['category3'].values.tolist()
+Qst = data['querys'].values.tolist()
+Ans = data['answers'].values.tolist()
+
+# =============================================================
+
+Idx = []
+Query = []
+Answer = []
+
+# =============================================================
 
 for i in range(len(data['querys'])):
-    classify(standard, Qst[i])
+    # category 출력
+    for j in range(len(standard['category3'])):
+        # category3[j] = tmp[j]
+        print(j, '번: ', tmp[j], end=' ')
+        if j % 6 == 0:
+            print()
+    # 코사인 유사도 측정 카테고리 출력
+    # a = s.get_recommendation(str(Qst[i]))
+    # 분류
+    classify(tmp, Qst[i], Ans[i])
 
-df = pd.DataFrame(category3)
-df.to_excel('src/sample_classified.xlsx')
+# ============================================
+# --  Excel 입력
+# ============================================
+wb = Workbook()
+sheet = wb.active
+sheet.title = '분류된 문장' # 컬럼명 지정(헤더)
+
+sheet.cell(row=1, column=1, value='인덱스')
+sheet.cell(row=1, column=2, value='질문')
+sheet.cell(row=1, column=3, value='질문 요약')
+sheet.cell(row=1, column=4, value='답변')
+sheet.cell(row=1, column=5, value='답변 요약')
+
+
+# 시트 저장
+row_no = 2
+for n, rows in enumerate(Query):
+  for seq, value in enumerate(rows):
+    sheet.cell(row=row_no+n, column=1, value=Idx[n])
+    sheet.cell(row=row_no+n, column=2, value=Query[n][0])
+    sheet.cell(row=row_no+n, column=3, value=Query[n][1])
+    sheet.cell(row=row_no+n, column=4, value=Answer[n][0])
+    sheet.cell(row=row_no+n, column=5, value=Answer[n][1])
+
+wb.save('src/sample_classified.xlsx')
+wb.close()
