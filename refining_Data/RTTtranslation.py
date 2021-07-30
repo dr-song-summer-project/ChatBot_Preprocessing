@@ -20,8 +20,8 @@ def get_excel(path):
 
 
 def get_translate(text):
-    client_id = "SpPXEctX91xMitWem7Jv" # <-- client_id 기입
-    client_secret = "RHYrtKj49l" # <-- client_secret 기입
+    client_id = "client_id" # <-- client_id 기입
+    client_secret = "client_secret" # <-- client_secret 기입
 
     data = {'text' : text,
             'source' : 'ko',
