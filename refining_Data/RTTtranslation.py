@@ -2,6 +2,14 @@ import requests
 import pandas as pd
 
 
+proxies = {
+    'http': 'http://220.149.25.33:80', #free proxy
+    'https': 'http://220.149.25.33:80',
+}
+
+start = 1500
+end = 1600
+
 def get_excel(path):
     df_ = pd.read_excel(path)
     data = pd.DataFrame()
@@ -10,7 +18,7 @@ def get_excel(path):
     Index = []
     result_Q = []
     result_A = []
-    for i in range(600, 700):
+    for i in range(start, end):
         if (len(querys[i]) < 30) and (("누락" not in querys[i]) and ("누락" not in answers[i])):
             # print(querys[i])
             Index.append(i)
@@ -34,8 +42,11 @@ def get_translate(text):
     header = {"X-Naver-Client-Id":client_id,
               "X-Naver-Client-Secret":client_secret}
 
+    # response = requests.post(url, headers=header, data=data, proxies=proxies)
     response = requests.post(url, headers=header, data=data)
     rescode = response.status_code
+
+    trans_data = "알 수 없는 오류"
 
     if(rescode==200):
         send_data = response.json()
@@ -47,7 +58,7 @@ def get_translate(text):
     data_reuslt = {'text': trans_data,
                    'source': 'ja',
                    'target': 'ko'}
-    response = requests.post(url, headers=header, data=data_reuslt)
+    response = requests.post(url, headers=header, data=data_reuslt, proxies=proxies)
     rescode = response.status_code
 
     if (rescode == 200):
@@ -68,8 +79,9 @@ for i in range (0, len(Index)):
     #trans.append(i)
     print(trans[i])
 
+
 for i in range (0, len(Index)):
     result_Df = result_Df.append(Df.loc[Index[i], ['질문', '질문 요약', '답변', '답변 요약']])
 
 result_Df['질문 요약'] = trans
-result_Df.to_excel('src/translated3.xlsx')
+result_Df.to_excel(f'src/translated{start}to{end}.xlsx')
